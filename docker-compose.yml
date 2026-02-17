@@ -196,7 +196,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "8080:80"
-      - "8443:443"
+      - "8444:443"
     depends_on:
       - auth_service
       - product_service

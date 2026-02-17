@@ -6,12 +6,12 @@ This project uses the following custom ports to avoid conflicts with common syst
 
 | Service | Default Port | Custom Port | Internal Port |
 |---------|-------------|-------------|---------------|
-| NGINX (HTTP) | 80 | **8080** | 80 |
-| NGINX (HTTPS) | 443 | **8443** | 443 |
-| Customer Frontend | 3000 | **3100** | 3000 |
-| Admin Portal | 3001 | **3101** | 3000 |
-| PostgreSQL | 5432 | **5433** | 5432 |
-| Redis | 6379 | **6380** | 6379 |
+| NGINX (HTTP) | 80 | **39080** | 80 |
+| NGINX (HTTPS) | 443 | **39443** | 443 |
+| Customer Frontend | 3000 | **39100** | 3000 |
+| Admin Portal | 3001 | **39101** | 3000 |
+| PostgreSQL | 5432 | **39432** | 5432 |
+| Redis | 6379 | **39379** | 6379 |
 
 ## Access URLs
 

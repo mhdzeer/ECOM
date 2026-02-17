@@ -1,0 +1,217 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecom_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce}
+      POSTGRES_USER: ${POSTGRES_USER:-ecom_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecom_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    networks:
+      - ecom_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecom_user}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ecom_redis
+    ports:
+      - "6380:6379"
+    networks:
+      - ecom_network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Auth Service
+  auth_service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecom_auth_service
+    environment:
+      SERVICE_NAME: auth_service
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ecom_user}:${POSTGRES_PASSWORD:-ecom_password}@postgres:5432/${POSTGRES_DB:-ecommerce}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ecom_network
+    command: uvicorn auth_service.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Product Service
+  product_service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecom_product_service
+    environment:
+      SERVICE_NAME: product_service
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ecom_user}:${POSTGRES_PASSWORD:-ecom_password}@postgres:5432/${POSTGRES_DB:-ecommerce}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ecom_network
+    command: uvicorn product_service.main:app --host 0.0.0.0 --port 8001 --reload
+
+  # Cart Service
+  cart_service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecom_cart_service
+    environment:
+      SERVICE_NAME: cart_service
+      REDIS_URL: redis://redis:6379
+      PRODUCT_SERVICE_URL: http://product_service:8001
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - ecom_network
+    command: uvicorn cart_service.main:app --host 0.0.0.0 --port 8002 --reload
+
+  # Order Service
+  order_service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecom_order_service
+    environment:
+      SERVICE_NAME: order_service
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ecom_user}:${POSTGRES_PASSWORD:-ecom_password}@postgres:5432/${POSTGRES_DB:-ecommerce}
+      REDIS_URL: redis://redis:6379
+      PRODUCT_SERVICE_URL: http://product_service:8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ecom_network
+    command: uvicorn order_service.main:app --host 0.0.0.0 --port 8003 --reload
+
+  # Payment Service
+  payment_service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecom_payment_service
+    environment:
+      SERVICE_NAME: payment_service
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ecom_user}:${POSTGRES_PASSWORD:-ecom_password}@postgres:5432/${POSTGRES_DB:-ecommerce}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_your_stripe_key}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_your_webhook_secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecom_network
+    command: uvicorn payment_service.main:app --host 0.0.0.0 --port 8004 --reload
+
+  # Delivery Service
+  delivery_service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecom_delivery_service
+    environment:
+      SERVICE_NAME: delivery_service
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ecom_user}:${POSTGRES_PASSWORD:-ecom_password}@postgres:5432/${POSTGRES_DB:-ecommerce}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecom_network
+    command: uvicorn delivery_service.main:app --host 0.0.0.0 --port 8005 --reload
+
+  # Customer Frontend (PWA)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: ecom_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost/api
+      NODE_ENV: development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3100:3000"
+    networks:
+      - ecom_network
+    command: npm run dev
+
+  # Admin Portal
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+      target: development
+    container_name: ecom_admin
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost/api
+      NODE_ENV: development
+    volumes:
+      - ./admin:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3101:3000"
+    networks:
+      - ecom_network
+    command: npm run dev
+
+  # NGINX Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ecom_nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
+      - "8443:443"
+    depends_on:
+      - auth_service
+      - product_service
+      - cart_service
+      - order_service
+      - payment_service
+      - delivery_service
+      - frontend
+      - admin
+    networks:
+      - ecom_network
+
+networks:
+  ecom_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

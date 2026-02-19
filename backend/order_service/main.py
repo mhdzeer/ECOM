@@ -14,7 +14,11 @@ import os
 from shared.database import Base, engine, get_db, init_db
 from shared.auth_middleware import get_current_user, get_current_admin
 
-app = FastAPI(title="Order Service", version="1.0.0")
+app = FastAPI(
+    title="Order Service", 
+    version="1.0.0",
+    root_path=os.getenv("ROOT_PATH", "")
+)
 
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])

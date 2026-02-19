@@ -10,7 +10,8 @@ from . import models, schemas, routes
 app = FastAPI(
     title="Auth Service",
     description="Authentication and authorization service",
-    version="1.0.0"
+    version="1.0.0",
+    root_path=os.getenv("ROOT_PATH", "")
 )
 
 # CORS configuration

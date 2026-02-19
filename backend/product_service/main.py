@@ -9,7 +9,8 @@ from . import models, routes
 app = FastAPI(
     title="Product Service",
     description="Product catalog and inventory management service",
-    version="1.0.0"
+    version="1.0.0",
+    root_path=os.getenv("ROOT_PATH", "")
 )
 
 # CORS configuration

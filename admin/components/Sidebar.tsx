@@ -1,119 +1,102 @@
 "use client";
 
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React from 'react';
+import { useAdmin } from './AdminContext';
 
-const Sidebar = () => {
+const navSections = [
+    {
+        label: 'Overview',
+        items: [
+            { href: '/admin', icon: '📊', label: 'Dashboard' },
+        ]
+    },
+    {
+        label: 'Store Management',
+        items: [
+            { href: '/admin/products', icon: '📦', label: 'Products' },
+            { href: '/admin/categories', icon: '🏷️', label: 'Categories' },
+            { href: '/admin/orders', icon: '🛒', label: 'Orders' },
+        ]
+    },
+    {
+        label: 'Platform',
+        items: [
+            { href: '/admin/users', icon: '👥', label: 'Customers' },
+            { href: '/admin/settings', icon: '⚙️', label: 'Settings' },
+        ]
+    }
+];
+
+export default function Sidebar() {
+    const { user, logout } = useAdmin();
     const pathname = usePathname();
 
-    const menuItems = [
-        { name: 'Dashboard', path: '/', icon: '📊' },
-        { name: 'Products', path: '/products', icon: '📦' },
-        { name: 'Categories', path: '/categories', icon: '📁' },
-        { name: 'Orders', path: '/orders', icon: '🛒' },
-        { name: 'Customers', path: '/customers', icon: '👥' },
-        { name: 'Settings', path: '/settings', icon: '⚙️' },
-    ];
-
     return (
-        <div style={{
-            width: '280px',
-            backgroundColor: '#ffffff',
-            color: '#111827',
-            height: '100vh',
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            borderRight: '1px solid #e5e7eb',
-            zIndex: 1000
+        <aside style={{
+            width: '240px', flexShrink: 0, height: '100vh', position: 'sticky', top: 0,
+            backgroundColor: '#111827', display: 'flex', flexDirection: 'column', overflow: 'hidden'
         }}>
-            <div style={{
-                padding: '30px 24px',
-                fontSize: '1.25rem',
-                fontWeight: '800',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                color: '#3b82f6'
-            }}>
-                <div style={{
-                    width: '35px',
-                    height: '35px',
-                    backgroundColor: '#3b82f6',
-                    borderRadius: '10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontSize: '1.2rem'
-                }}>AZ</div>
-                <span>ALZAIN.ADMIN</span>
-            </div>
-
-            <nav style={{ padding: '20px 16px', flex: 1 }}>
-                <p style={{ fontSize: '0.75rem', fontWeight: '800', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '15px', paddingLeft: '12px' }}>
-                    Main Menu
-                </p>
-                {menuItems.map((item) => {
-                    const isActive = pathname === item.path;
-                    return (
-                        <Link
-                            key={item.path}
-                            href={item.path}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                padding: '14px 16px',
-                                marginBottom: '6px',
-                                borderRadius: '12px',
-                                textDecoration: 'none',
-                                color: isActive ? '#3b82f6' : '#4b5563',
-                                backgroundColor: isActive ? '#eff6ff' : 'transparent',
-                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                fontWeight: isActive ? '700' : '500',
-                                fontSize: '0.95rem'
-                            }}
-                        >
-                            <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
-                            {item.name}
-                        </Link>
-                    );
-                })}
-            </nav>
-
-            <div style={{
-                margin: '20px',
-                padding: '20px',
-                backgroundColor: '#f9fafb',
-                borderRadius: '16px',
-                border: '1px solid #f3f4f6'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>AD</div>
+            {/* Logo */}
+            <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #2563eb, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '900', fontSize: '0.85rem' }}>AZ</div>
                     <div>
-                        <div style={{ fontWeight: '700', fontSize: '0.85rem' }}>Admin User</div>
-                        <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>owner@alzain.com</div>
+                        <div style={{ color: 'white', fontWeight: '800', fontSize: '0.95rem' }}>AlZain Admin</div>
+                        <div style={{ color: '#6b7280', fontSize: '0.7rem' }}>Control Panel</div>
                     </div>
                 </div>
-                <button style={{
-                    width: '100%',
-                    marginTop: '10px',
-                    padding: '8px',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                    color: '#ef4444',
-                    backgroundColor: 'white',
-                    border: '1px solid #fee2e2',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                }}>Sign Out</button>
             </div>
-        </div>
-    );
-};
 
-export default Sidebar;
+            {/* Navigation */}
+            <nav style={{ flex: 1, padding: '16px 12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {navSections.map(section => (
+                    <div key={section.label}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '1px', padding: '0 10px', marginBottom: '6px' }}>
+                            {section.label}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            {section.items.map(item => {
+                                const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
+                                return (
+                                    <Link key={item.href} href={item.href} style={{
+                                        display: 'flex', alignItems: 'center', gap: '10px',
+                                        padding: '10px 12px', borderRadius: '10px', fontSize: '0.875rem',
+                                        backgroundColor: isActive ? 'rgba(37,99,235,0.15)' : 'transparent',
+                                        color: isActive ? '#60a5fa' : '#9ca3af',
+                                        fontWeight: isActive ? '700' : '400',
+                                        transition: 'all 0.15s',
+                                    }}
+                                        onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
+                                        onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'transparent'; }}
+                                    >
+                                        <span style={{ fontSize: '1rem' }}>{item.icon}</span>
+                                        {item.label}
+                                        {isActive && <div style={{ marginLeft: 'auto', width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#60a5fa' }} />}
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </nav>
+
+            {/* User footer */}
+            {user && (
+                <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #2563eb, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '0.8rem', flexShrink: 0 }}>
+                            {(user.full_name?.[0] || user.email[0]).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ color: 'white', fontSize: '0.8rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.full_name || user.email}</div>
+                            <div style={{ color: '#6b7280', fontSize: '0.7rem' }}>Administrator</div>
+                        </div>
+                        <button onClick={logout} title="Sign out" style={{ background: 'none', border: 'none', color: '#4b5563', cursor: 'pointer', fontSize: '1rem', flexShrink: 0 }}>↩</button>
+                    </div>
+                </div>
+            )}
+        </aside>
+    );
+}

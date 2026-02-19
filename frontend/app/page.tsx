@@ -1,263 +1,251 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Navigation from '../components/Navigation';
+import Footer from '../components/Footer';
+import { AppProvider, useApp } from '../components/AppContext';
+import { api } from '../lib/api';
 
 interface Product {
     id: number;
     name: string;
+    slug: string;
     description: string;
     price: number;
+    compare_price?: number;
     stock_quantity: number;
-    sku: string;
-    images: { image_url: string }[];
+    is_featured: boolean;
+    images: { image_url: string; is_primary: boolean }[];
+    category?: { name: string };
 }
 
-interface CartItem {
-    product: {
-        id: number;
-        name: string;
-        price: number;
-    };
-    quantity: number;
+interface Category {
+    id: number;
+    name: string;
+    slug: string;
+}
+
+function ProductCard({ product }: { product: Product }) {
+    const { addToCart, toggleWishlist, isInWishlist } = useApp();
+    const inWishlist = isInWishlist(product.id);
+    const image = product.images?.[0]?.image_url;
+    const discount = product.compare_price
+        ? Math.round((1 - product.price / product.compare_price) * 100)
+        : null;
+
+    return (
+        <div style={{
+            backgroundColor: 'white', borderRadius: '20px', overflow: 'hidden',
+            border: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column',
+            transition: 'transform 0.25s ease, box-shadow 0.25s ease', position: 'relative'
+        }}
+            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-6px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; }}
+        >
+            {/* Wishlist */}
+            <button onClick={() => toggleWishlist(product.id)} style={{
+                position: 'absolute', top: '16px', right: '16px', zIndex: 2,
+                width: '36px', height: '36px', borderRadius: '50%',
+                backgroundColor: inWishlist ? '#fef2f2' : 'rgba(255,255,255,0.9)',
+                border: '1px solid ' + (inWishlist ? '#fecaca' : '#e5e7eb'),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1rem', cursor: 'pointer', backdropFilter: 'blur(4px)'
+            }}>
+                {inWishlist ? '❤️' : '🤍'}
+            </button>
+
+            {/* Badge */}
+            {discount && <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 2, backgroundColor: '#dc2626', color: 'white', fontSize: '0.75rem', fontWeight: '800', padding: '4px 10px', borderRadius: '99px' }}>-{discount}%</div>}
+
+            {/* Image */}
+            <Link href={`/products/${product.id}`}>
+                <div style={{ height: '280px', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+                    {image
+                        ? <img src={image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <span style={{ fontSize: '5rem', opacity: 0.15 }}>📦</span>}
+                    {product.stock_quantity === 0 && (
+                        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ color: 'white', fontWeight: '800', fontSize: '0.9rem', letterSpacing: '2px' }}>SOLD OUT</span>
+                        </div>
+                    )}
+                </div>
+            </Link>
+
+            {/* Details */}
+            <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {product.category && (
+                    <span style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {product.category.name}
+                    </span>
+                )}
+                <Link href={`/products/${product.id}`}>
+                    <h3 style={{ margin: '6px 0 8px', fontSize: '1.05rem', fontWeight: '700', color: '#111827', lineHeight: '1.3' }}>
+                        {product.name}
+                    </h3>
+                </Link>
+                <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: '0 0 auto', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {product.description}
+                </p>
+                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <span style={{ fontSize: '1.4rem', fontWeight: '900', color: '#111827' }}>${product.price.toFixed(2)}</span>
+                        {product.compare_price && <span style={{ fontSize: '0.9rem', color: '#9ca3af', textDecoration: 'line-through', marginLeft: '8px' }}>${product.compare_price.toFixed(2)}</span>}
+                    </div>
+                    <button
+                        disabled={product.stock_quantity === 0}
+                        onClick={() => addToCart(product)}
+                        style={{
+                            backgroundColor: product.stock_quantity > 0 ? '#2563eb' : '#d1d5db',
+                            color: 'white', padding: '10px 20px', borderRadius: '12px', border: 'none',
+                            fontWeight: '700', fontSize: '0.875rem', cursor: product.stock_quantity > 0 ? 'pointer' : 'not-allowed',
+                            transition: 'background-color 0.15s'
+                        }}
+                    >
+                        {product.stock_quantity > 0 ? 'Add to Cart' : 'Out of Stock'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function HomeContent() {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [featured, setFeatured] = useState<Product[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+
+    useEffect(() => {
+        Promise.all([
+            api.getProducts({ page_size: 12 }),
+            api.getProducts({ is_featured: true, page_size: 6 }),
+            api.getCategories(),
+        ]).then(([p, f, c]) => {
+            setProducts(p.products || []);
+            setFeatured(f.products || []);
+            setCategories(c || []);
+            setLoading(false);
+        }).catch(() => setLoading(false));
+    }, []);
+
+    const filteredProducts = products.filter(p => {
+        const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
+        const matchCat = !selectedCategory || p.category?.name === categories.find(c => c.id === selectedCategory)?.name;
+        return matchSearch && matchCat;
+    });
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+            <Navigation />
+
+            {/* Hero */}
+            <section style={{
+                padding: '80px 20px 100px',
+                background: 'linear-gradient(135deg, #eff6ff 0%, #f5f3ff 50%, #fef3c7 100%)',
+                textAlign: 'center',
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
+                <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%)' }} />
+                <div style={{ maxWidth: '700px', margin: '0 auto', position: 'relative' }}>
+                    <div style={{ display: 'inline-block', backgroundColor: '#dbeafe', color: '#1d4ed8', padding: '6px 20px', borderRadius: '99px', fontSize: '0.8rem', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '24px' }}>
+                        🎉 Free shipping on orders over $50
+                    </div>
+                    <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 4.5rem)', fontWeight: '900', lineHeight: '1.1', color: '#111827', marginBottom: '20px', letterSpacing: '-2px' }}>
+                        Shop Premium.<br />
+                        <span style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Live Better.</span>
+                    </h1>
+                    <p style={{ fontSize: '1.2rem', color: '#4b5563', marginBottom: '40px', lineHeight: '1.6' }}>
+                        Curated products from around the world, delivered to your doorstep.
+                    </p>
+                    {/* Search Bar */}
+                    <div style={{ display: 'flex', gap: '12px', maxWidth: '500px', margin: '0 auto' }}>
+                        <input
+                            type="text"
+                            placeholder="Search for products..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            style={{ flex: 1, padding: '16px 20px', borderRadius: '16px', border: '2px solid #e5e7eb', fontSize: '1rem', outline: 'none', backgroundColor: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+                        />
+                        <Link href="/products" style={{ padding: '16px 28px', backgroundColor: '#2563eb', color: 'white', borderRadius: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', textDecoration: 'none', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>Browse All</Link>
+                    </div>
+                </div>
+            </section>
+
+            {/* Categories */}
+            {categories.length > 0 && (
+                <section style={{ padding: '40px 20px', maxWidth: '1280px', margin: '0 auto', width: '100%' }}>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '20px', color: '#111827' }}>Shop by Category</h2>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <button
+                            onClick={() => setSelectedCategory(null)}
+                            style={{ padding: '10px 24px', borderRadius: '99px', border: '2px solid ' + (!selectedCategory ? '#2563eb' : '#e5e7eb'), backgroundColor: !selectedCategory ? '#eff6ff' : 'white', color: !selectedCategory ? '#2563eb' : '#4b5563', fontWeight: '600', cursor: 'pointer', transition: 'all 0.15s', fontSize: '0.9rem' }}
+                        >All Products</button>
+                        {categories.map(c => (
+                            <button
+                                key={c.id}
+                                onClick={() => setSelectedCategory(c.id)}
+                                style={{ padding: '10px 24px', borderRadius: '99px', border: '2px solid ' + (selectedCategory === c.id ? '#2563eb' : '#e5e7eb'), backgroundColor: selectedCategory === c.id ? '#eff6ff' : 'white', color: selectedCategory === c.id ? '#2563eb' : '#4b5563', fontWeight: '600', cursor: 'pointer', transition: 'all 0.15s', fontSize: '0.9rem' }}
+                            >{c.name}</button>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* Products Grid */}
+            <section style={{ padding: '0 20px 80px', maxWidth: '1280px', margin: '0 auto', width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#111827' }}>
+                        {search ? `Results for "${search}"` : 'Featured Products'}
+                    </h2>
+                    <Link href="/products" style={{ color: '#2563eb', fontWeight: '600', fontSize: '0.9rem', textDecoration: 'none' }}>View all →</Link>
+                </div>
+
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '80px' }}><div className="spinner" /></div>
+                ) : filteredProducts.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '80px', backgroundColor: '#f9fafb', borderRadius: '20px' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🔍</div>
+                        <p style={{ fontSize: '1.2rem', color: '#6b7280' }}>No products found.</p>
+                        <button onClick={() => { setSearch(''); setSelectedCategory(null); }} style={{ marginTop: '16px', padding: '10px 24px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' }}>Clear filters</button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
+                        {filteredProducts.map(p => <ProductCard key={p.id} product={p} />)}
+                    </div>
+                )}
+            </section>
+
+            {/* Features */}
+            <section style={{ backgroundColor: '#f9fafb', padding: '60px 20px' }}>
+                <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '30px' }}>
+                    {[
+                        { icon: '🚚', title: 'Free Delivery', desc: 'On orders above $50' },
+                        { icon: '🔄', title: 'Easy Returns', desc: '30-day return policy' },
+                        { icon: '🔒', title: 'Secure Payments', desc: 'SSL encrypted checkout' },
+                        { icon: '💬', title: '24/7 Support', desc: 'Always here to help' },
+                    ].map(f => (
+                        <div key={f.title} style={{ textAlign: 'center', padding: '30px 20px' }}>
+                            <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>{f.icon}</div>
+                            <h3 style={{ fontWeight: '700', marginBottom: '6px', color: '#111827' }}>{f.title}</h3>
+                            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>{f.desc}</p>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            <Footer />
+        </div>
+    );
 }
 
 export default function Home() {
-    const router = useRouter();
-    const [products, setProducts] = useState<Product[]>([]);
-    const [cart, setCart] = useState<CartItem[]>([]);
-    const [showCart, setShowCart] = useState(false);
-    const [loading, setLoading] = useState(true);
-
-    const domain = typeof window !== 'undefined' ? window.location.hostname : 'alzainportal.shopinbh.com';
-    const apiUrl = `http://${domain}:39101/api/products`;
-
-    useEffect(() => {
-        fetchProducts();
-        // Load cart from local storage
-        const savedCart = localStorage.getItem('ecom_cart');
-        if (savedCart) setCart(JSON.parse(savedCart));
-    }, []);
-
-    useEffect(() => {
-        localStorage.setItem('ecom_cart', JSON.stringify(cart));
-    }, [cart]);
-
-    const fetchProducts = async () => {
-        try {
-            const response = await axios.get(`${apiUrl}/`);
-            setProducts(response.data.products || []);
-            setLoading(false);
-        } catch (error) {
-            console.error('Error fetching products:', error);
-            setLoading(false);
-        }
-    };
-
-    const addToCart = (product: Product) => {
-        setCart(prev => {
-            const existing = prev.find(item => item.product.id === product.id);
-            if (existing) {
-                return prev.map(item =>
-                    item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-                );
-            }
-            return [...prev, { product: { id: product.id, name: product.name, price: product.price }, quantity: 1 }];
-        });
-        setShowCart(true);
-    };
-
-    const removeFromCart = (id: number) => {
-        setCart(prev => prev.filter(item => item.product.id !== id));
-    };
-
-    const cartTotal = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
-    const cartCount = cart.reduce((a, b) => a + b.quantity, 0);
-
     return (
-        <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#fdfdfd', minHeight: '100vh', color: '#1a1a1a' }}>
-            <Navigation cartCount={cartCount} onCartClick={() => setShowCart(true)} />
-
-            {/* Hero Section */}
-            <section style={{
-                padding: '80px 5%',
-                textAlign: 'center',
-                background: 'linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%)',
-                marginBottom: '40px'
-            }}>
-                <h1 style={{ fontSize: '4rem', fontWeight: '900', margin: 0, color: '#111827', letterSpacing: '-2px' }}>
-                    Discover Luxury <span style={{ color: '#3b82f6' }}>Essentials</span>
-                </h1>
-                <p style={{ fontSize: '1.25rem', color: '#6b7280', marginTop: '20px', maxWidth: '600px', marginInline: 'auto' }}>
-                    Elevate your lifestyle with our curated collection of premium products, designed for style and durability.
-                </p>
-            </section>
-
-            {/* Product Grid */}
-            <main style={{ padding: '0 5% 80px' }}>
-                <h2 style={{ fontSize: '2rem', marginBottom: '30px', fontWeight: '800' }}>Featured Collection</h2>
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                    gap: '30px'
-                }}>
-                    {loading ? (
-                        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '100px', color: '#9ca3af' }}>
-                            Loading the latest arrivals...
-                        </div>
-                    ) : products.length === 0 ? (
-                        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '100px', backgroundColor: '#f9fafb', borderRadius: '30px' }}>
-                            <p style={{ fontSize: '1.2rem', color: '#6b7280' }}>Our catalog is currently getting an update. Check back soon!</p>
-                        </div>
-                    ) : (
-                        products.map((p) => (
-                            <div key={p.id} style={{
-                                backgroundColor: 'white',
-                                borderRadius: '24px',
-                                overflow: 'hidden',
-                                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                                border: '1px solid #f3f4f6',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                flexDirection: 'column'
-                            }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(-10px)';
-                                    e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0,0,0,0.08)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = 'none';
-                                }}
-                            >
-                                <div style={{
-                                    backgroundColor: '#f9fafb',
-                                    height: '320px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '4rem',
-                                    overflow: 'hidden',
-                                    position: 'relative'
-                                }}>
-                                    {p.images?.[0] ? (
-                                        <img src={p.images[0].image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={p.name} />
-                                    ) : '📦'}
-                                    {p.stock_quantity === 0 && (
-                                        <div style={{ position: 'absolute', top: '20px', right: '20px', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '5px 15px', borderRadius: '99px', fontSize: '0.8rem', fontWeight: '700' }}>OUT OF STOCK</div>
-                                    )}
-                                </div>
-                                <div style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                                    <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '1px' }}>New Arrival</div>
-                                    <h3 style={{ margin: 0, fontSize: '1.3rem', color: '#111827', fontWeight: '700' }}>{p.name}</h3>
-                                    <p style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '10px', minHeight: '45px', lineHeight: '1.5' }}>{p.description}</p>
-
-                                    <div style={{ marginTop: 'auto', paddingTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div style={{ fontSize: '1.6rem', fontWeight: '900', color: '#111827' }}>${p.price.toFixed(2)}</div>
-                                        <button
-                                            disabled={p.stock_quantity === 0}
-                                            onClick={() => addToCart(p)}
-                                            style={{
-                                                backgroundColor: p.stock_quantity > 0 ? '#111827' : '#9ca3af',
-                                                color: 'white',
-                                                padding: '12px 24px',
-                                                borderRadius: '14px',
-                                                border: 'none',
-                                                fontWeight: '700',
-                                                cursor: p.stock_quantity > 0 ? 'pointer' : 'default',
-                                                transition: 'background-color 0.2s'
-                                            }}
-                                        >
-                                            {p.stock_quantity > 0 ? 'Add to Cart' : 'Sold Out'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </main>
-
-            {/* Cart Sidebar */}
-            {showCart && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0, right: 0, bottom: 0,
-                    width: '100%', maxWidth: '480px',
-                    backgroundColor: 'white',
-                    boxShadow: '-20px 0 50px rgba(0,0,0,0.15)',
-                    zIndex: 2000,
-                    padding: '40px',
-                    display: 'flex',
-                    flexDirection: 'column'
-                }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
-                        <h2 style={{ fontSize: '2rem', margin: 0, fontWeight: '900' }}>Your Bag</h2>
-                        <button onClick={() => setShowCart(false)} style={{ background: 'none', border: 'none', fontSize: '2.5rem', cursor: 'pointer', color: '#9ca3af' }}>×</button>
-                    </div>
-
-                    <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }}>
-                        {cart.length === 0 ? (
-                            <div style={{ textAlign: 'center', marginTop: '100px' }}>
-                                <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🛍️</div>
-                                <p style={{ fontSize: '1.1rem', color: '#6b7280' }}>Your bag is empty.</p>
-                                <button
-                                    onClick={() => setShowCart(false)}
-                                    style={{ marginTop: '20px', color: '#3b82f6', background: 'none', border: 'none', fontWeight: '700', cursor: 'pointer' }}
-                                >
-                                    Go shopping →
-                                </button>
-                            </div>
-                        ) : (
-                            cart.map((item) => (
-                                <div key={item.product.id} style={{ display: 'flex', gap: '20px', marginBottom: '30px', paddingBottom: '30px', borderBottom: '1px solid #f3f4f6' }}>
-                                    <div style={{ width: '100px', height: '100px', backgroundColor: '#f9fafb', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}>
-                                        📦
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>{item.product.name}</h4>
-                                            <button onClick={() => removeFromCart(item.product.id)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}>Remove</button>
-                                        </div>
-                                        <div style={{ color: '#6b7280', fontSize: '0.95rem', margin: '8px 0' }}>Qty: {item.quantity}</div>
-                                        <div style={{ fontWeight: '800', fontSize: '1.2rem' }}>${(item.product.price * item.quantity).toFixed(2)}</div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    <div style={{ marginTop: '40px', borderTop: '2px solid #111827', paddingTop: '30px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: '900', marginBottom: '30px' }}>
-                            <span>Total</span>
-                            <span>${cartTotal.toFixed(2)}</span>
-                        </div>
-                        <button
-                            disabled={cart.length === 0}
-                            onClick={() => router.push('/checkout')}
-                            style={{
-                                width: '100%',
-                                backgroundColor: cart.length > 0 ? '#111827' : '#9ca3af',
-                                color: 'white',
-                                padding: '22px',
-                                borderRadius: '20px',
-                                border: 'none',
-                                fontWeight: '800',
-                                fontSize: '1.2rem',
-                                cursor: cart.length > 0 ? 'pointer' : 'default',
-                                boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
-                            }}
-                        >
-                            Check Out
-                        </button>
-                        <p style={{ textAlign: 'center', color: '#6b7280', fontSize: '0.85rem', marginTop: '20px' }}>
-                            Taxes and shipping calculated at checkout.
-                        </p>
-                    </div>
-                </div>
-            )}
-        </div>
+        <AppProvider>
+            <HomeContent />
+        </AppProvider>
     );
 }

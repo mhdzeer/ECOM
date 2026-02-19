@@ -20,8 +20,7 @@ app = FastAPI(
     root_path=os.getenv("ROOT_PATH", "")
 )
 
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
-app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 
 # Models
 class OrderStatus(str, enum.Enum):
@@ -109,9 +108,9 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     order_number = f"ORD-{random.randint(100000, 999999)}"
     
     subtotal = sum(item.price * item.quantity for item in order_data.items)
-    tax = subtotal * 0.1  # 10% tax
-    shipping_cost = 10.0
-    total = subtotal + tax + shipping_cost
+    tax = round(subtotal * 0.1, 2)
+    shipping_cost = 0.0 if subtotal >= 50 else 5.99
+    total = round(subtotal + tax + shipping_cost, 2)
     
     order = Order(
         user_id=int(current_user["sub"]),
@@ -143,6 +142,16 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     db.refresh(order)
     return order
 
+@app.get("/admin/all", response_model=List[OrderResponse])
+async def list_all_orders(
+    skip: int = 0, limit: int = 100,
+    current_admin: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """List all orders (admin only)"""
+    orders = db.query(Order).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
+    return orders
+
 @app.get("/", response_model=List[OrderResponse])
 async def list_orders(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """List user's orders"""
@@ -170,3 +179,20 @@ async def update_order_status(order_id: int, status: OrderStatus, current_admin:
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "order_service"}
+
+@app.get("/admin/stats")
+async def order_stats(current_admin: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Get order statistics (admin only)"""
+    total = db.query(Order).count()
+    pending = db.query(Order).filter(Order.status == OrderStatus.PENDING).count()
+    processing = db.query(Order).filter(Order.status == OrderStatus.PROCESSING).count()
+    shipped = db.query(Order).filter(Order.status == OrderStatus.SHIPPED).count()
+    delivered = db.query(Order).filter(Order.status == OrderStatus.DELIVERED).count()
+    cancelled = db.query(Order).filter(Order.status == OrderStatus.CANCELLED).count()
+    from sqlalchemy import func as sqlfunc
+    revenue = db.query(sqlfunc.sum(Order.total)).filter(Order.status == OrderStatus.DELIVERED).scalar() or 0
+    return {
+        "total": total, "pending": pending, "processing": processing,
+        "shipped": shipped, "delivered": delivered, "cancelled": cancelled,
+        "revenue": round(revenue, 2)
+    }

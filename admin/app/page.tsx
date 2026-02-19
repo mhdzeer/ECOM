@@ -1,6 +1,6 @@
 export default function AdminHome() {
     const domain = typeof window !== 'undefined' ? window.location.hostname : 'alzainportal.shopinbh.com';
-    const baseUrl = `http://${domain}:39080/api`;
+    const baseUrl = `http://${domain}:39101/api`;
 
     const managementLinks = [
         { name: '📦 Product Management', path: '/products/docs', color: '#4f46e5' },

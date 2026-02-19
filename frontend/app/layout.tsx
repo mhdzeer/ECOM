@@ -1,6 +1,6 @@
 export const metadata = {
-    title: 'E-commerce Platform',
-    description: 'Modern e-commerce platform with microservices',
+    title: 'AlZain Shop - Premium E-commerce',
+    description: 'Discover premium products curated for you.',
 }
 
 export default function RootLayout({
@@ -10,7 +10,7 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en">
-            <body>{children}</body>
+            <body style={{ margin: 0, padding: 0 }}>{children}</body>
         </html>
     )
 }

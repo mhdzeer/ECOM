@@ -162,7 +162,7 @@ services:
       target: development
     container_name: ecom_frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost/api
+      NEXT_PUBLIC_API_URL: http://alzainportal.shopinbh.com/api
       NODE_ENV: development
     volumes:
       - ./frontend:/app
@@ -182,7 +182,7 @@ services:
       target: development
     container_name: ecom_admin
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost/api
+      NEXT_PUBLIC_API_URL: http://alzainportal.shopinbh.com/api
       NODE_ENV: development
     volumes:
       - ./admin:/app

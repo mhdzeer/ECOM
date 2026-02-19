@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useRouter } from 'next/navigation';
+import Navigation from '../components/Navigation';
 
 interface Product {
     id: number;
@@ -10,14 +12,20 @@ interface Product {
     price: number;
     stock_quantity: number;
     sku: string;
+    images: { image_url: string }[];
 }
 
 interface CartItem {
-    product: Product;
+    product: {
+        id: number;
+        name: string;
+        price: number;
+    };
     quantity: number;
 }
 
 export default function Home() {
+    const router = useRouter();
     const [products, setProducts] = useState<Product[]>([]);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [showCart, setShowCart] = useState(false);
@@ -28,7 +36,14 @@ export default function Home() {
 
     useEffect(() => {
         fetchProducts();
+        // Load cart from local storage
+        const savedCart = localStorage.getItem('ecom_cart');
+        if (savedCart) setCart(JSON.parse(savedCart));
     }, []);
+
+    useEffect(() => {
+        localStorage.setItem('ecom_cart', JSON.stringify(cart));
+    }, [cart]);
 
     const fetchProducts = async () => {
         try {
@@ -49,63 +64,21 @@ export default function Home() {
                     item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
                 );
             }
-            return [...prev, { product, quantity: 1 }];
+            return [...prev, { product: { id: product.id, name: product.name, price: product.price }, quantity: 1 }];
         });
         setShowCart(true);
     };
 
+    const removeFromCart = (id: number) => {
+        setCart(prev => prev.filter(item => item.product.id !== id));
+    };
+
     const cartTotal = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+    const cartCount = cart.reduce((a, b) => a + b.quantity, 0);
 
     return (
         <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#fdfdfd', minHeight: '100vh', color: '#1a1a1a' }}>
-            {/* Navigation */}
-            <nav style={{
-                padding: '20px 5%',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                position: 'sticky',
-                top: 0,
-                backgroundColor: 'rgba(255,255,255,0.8)',
-                backdropFilter: 'blur(10px)',
-                zIndex: 1000,
-                borderBottom: '1px solid #eee'
-            }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: '800', letterSpacing: '-1px' }}>
-                    ALZAIN<span style={{ color: '#3b82f6' }}>SHOP</span>
-                </div>
-                <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-                    <a href="#" style={{ textDecoration: 'none', color: '#4b5563', fontWeight: '500' }}>Shop</a>
-                    <a href="#" style={{ textDecoration: 'none', color: '#4b5563', fontWeight: '500' }}>Categories</a>
-                    <button
-                        onClick={() => setShowCart(true)}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            fontSize: '1.5rem',
-                            cursor: 'pointer',
-                            position: 'relative'
-                        }}
-                    >
-                        🛒
-                        {cart.length > 0 && (
-                            <span style={{
-                                position: 'absolute',
-                                top: '-5px',
-                                right: '-5px',
-                                backgroundColor: '#3b82f6',
-                                color: 'white',
-                                fontSize: '0.7rem',
-                                padding: '2px 6px',
-                                borderRadius: '50%',
-                                fontWeight: 'bold'
-                            }}>
-                                {cart.reduce((a, b) => a + b.quantity, 0)}
-                            </span>
-                        )}
-                    </button>
-                </div>
-            </nav>
+            <Navigation cartCount={cartCount} onCartClick={() => setShowCart(true)} />
 
             {/* Hero Section */}
             <section style={{
@@ -115,28 +88,28 @@ export default function Home() {
                 marginBottom: '40px'
             }}>
                 <h1 style={{ fontSize: '4rem', fontWeight: '900', margin: 0, color: '#111827', letterSpacing: '-2px' }}>
-                    Discovery Premium <span style={{ color: '#3b82f6' }}>Products</span>
+                    Discover Luxury <span style={{ color: '#3b82f6' }}>Essentials</span>
                 </h1>
                 <p style={{ fontSize: '1.25rem', color: '#6b7280', marginTop: '20px', maxWidth: '600px', marginInline: 'auto' }}>
-                    Shop the latest trends in high-quality fashion curriculum and essentials curated just for you.
+                    Elevate your lifestyle with our curated collection of premium products, designed for style and durability.
                 </p>
             </section>
 
             {/* Product Grid */}
             <main style={{ padding: '0 5% 80px' }}>
-                <h2 style={{ fontSize: '2rem', marginBottom: '30px' }}>Featured Items</h2>
+                <h2 style={{ fontSize: '2rem', marginBottom: '30px', fontWeight: '800' }}>Featured Collection</h2>
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
                     gap: '30px'
                 }}>
                     {loading ? (
                         <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '100px', color: '#9ca3af' }}>
-                            Loading curated selection...
+                            Loading the latest arrivals...
                         </div>
                     ) : products.length === 0 ? (
-                        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '100px', color: '#9ca3af' }}>
-                            Our collection is coming soon. Stay tuned!
+                        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '100px', backgroundColor: '#f9fafb', borderRadius: '30px' }}>
+                            <p style={{ fontSize: '1.2rem', color: '#6b7280' }}>Our catalog is currently getting an update. Check back soon!</p>
                         </div>
                     ) : (
                         products.map((p) => (
@@ -146,39 +119,58 @@ export default function Home() {
                                 overflow: 'hidden',
                                 transition: 'transform 0.3s ease, box-shadow 0.3s ease',
                                 border: '1px solid #f3f4f6',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column'
                             }}
                                 onMouseEnter={(e) => {
                                     e.currentTarget.style.transform = 'translateY(-10px)';
-                                    e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0,0,0,0.1)';
+                                    e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0,0,0,0.08)';
                                 }}
                                 onMouseLeave={(e) => {
                                     e.currentTarget.style.transform = 'translateY(0)';
                                     e.currentTarget.style.boxShadow = 'none';
                                 }}
                             >
-                                <div style={{ backgroundColor: '#f9fafb', height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>
-                                    📦
+                                <div style={{
+                                    backgroundColor: '#f9fafb',
+                                    height: '320px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '4rem',
+                                    overflow: 'hidden',
+                                    position: 'relative'
+                                }}>
+                                    {p.images?.[0] ? (
+                                        <img src={p.images[0].image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={p.name} />
+                                    ) : '📦'}
+                                    {p.stock_quantity === 0 && (
+                                        <div style={{ position: 'absolute', top: '20px', right: '20px', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '5px 15px', borderRadius: '99px', fontSize: '0.8rem', fontWeight: '700' }}>OUT OF STOCK</div>
+                                    )}
                                 </div>
-                                <div style={{ padding: '24px' }}>
-                                    <div style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: '700', textTransform: 'uppercase', marginBottom: '8px' }}>Essential</div>
-                                    <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#111827' }}>{p.name}</h3>
-                                    <p style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '8px', minHeight: '40px' }}>{p.description}</p>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px' }}>
-                                        <span style={{ fontSize: '1.5rem', fontWeight: '800' }}>${p.price}</span>
+                                <div style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                    <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '1px' }}>New Arrival</div>
+                                    <h3 style={{ margin: 0, fontSize: '1.3rem', color: '#111827', fontWeight: '700' }}>{p.name}</h3>
+                                    <p style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '10px', minHeight: '45px', lineHeight: '1.5' }}>{p.description}</p>
+
+                                    <div style={{ marginTop: 'auto', paddingTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ fontSize: '1.6rem', fontWeight: '900', color: '#111827' }}>${p.price.toFixed(2)}</div>
                                         <button
+                                            disabled={p.stock_quantity === 0}
                                             onClick={() => addToCart(p)}
                                             style={{
-                                                backgroundColor: '#111827',
+                                                backgroundColor: p.stock_quantity > 0 ? '#111827' : '#9ca3af',
                                                 color: 'white',
-                                                padding: '10px 20px',
-                                                borderRadius: '12px',
+                                                padding: '12px 24px',
+                                                borderRadius: '14px',
                                                 border: 'none',
-                                                fontWeight: '600',
-                                                cursor: 'pointer'
+                                                fontWeight: '700',
+                                                cursor: p.stock_quantity > 0 ? 'pointer' : 'default',
+                                                transition: 'background-color 0.2s'
                                             }}
                                         >
-                                            Add to Cart
+                                            {p.stock_quantity > 0 ? 'Add to Cart' : 'Sold Out'}
                                         </button>
                                     </div>
                                 </div>
@@ -188,64 +180,81 @@ export default function Home() {
                 </div>
             </main>
 
-            {/* Cart Sidebar/Drawer */}
+            {/* Cart Sidebar */}
             {showCart && (
                 <div style={{
                     position: 'fixed',
                     top: 0, right: 0, bottom: 0,
-                    width: '100%', maxWidth: '450px',
+                    width: '100%', maxWidth: '480px',
                     backgroundColor: 'white',
-                    boxShadow: '-10px 0 30px rgba(0,0,0,0.1)',
+                    boxShadow: '-20px 0 50px rgba(0,0,0,0.15)',
                     zIndex: 2000,
                     padding: '40px',
                     display: 'flex',
                     flexDirection: 'column'
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
-                        <h2 style={{ fontSize: '1.75rem', margin: 0 }}>Your Cart</h2>
-                        <button onClick={() => setShowCart(false)} style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: 'pointer' }}>×</button>
+                        <h2 style={{ fontSize: '2rem', margin: 0, fontWeight: '900' }}>Your Bag</h2>
+                        <button onClick={() => setShowCart(false)} style={{ background: 'none', border: 'none', fontSize: '2.5rem', cursor: 'pointer', color: '#9ca3af' }}>×</button>
                     </div>
 
-                    <div style={{ flex: 1, overflowY: 'auto' }}>
+                    <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }}>
                         {cart.length === 0 ? (
-                            <p style={{ color: '#9ca3af', textAlign: 'center', marginTop: '100px' }}>Your cart is empty.</p>
+                            <div style={{ textAlign: 'center', marginTop: '100px' }}>
+                                <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🛍️</div>
+                                <p style={{ fontSize: '1.1rem', color: '#6b7280' }}>Your bag is empty.</p>
+                                <button
+                                    onClick={() => setShowCart(false)}
+                                    style={{ marginTop: '20px', color: '#3b82f6', background: 'none', border: 'none', fontWeight: '700', cursor: 'pointer' }}
+                                >
+                                    Go shopping →
+                                </button>
+                            </div>
                         ) : (
                             cart.map((item) => (
-                                <div key={item.product.id} style={{ display: 'flex', gap: '15px', marginBottom: '25px', paddingBottom: '25px', borderBottom: '1px solid #f3f4f6' }}>
-                                    <div style={{ width: '80px', height: '80px', backgroundColor: '#f9fafb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
+                                <div key={item.product.id} style={{ display: 'flex', gap: '20px', marginBottom: '30px', paddingBottom: '30px', borderBottom: '1px solid #f3f4f6' }}>
+                                    <div style={{ width: '100px', height: '100px', backgroundColor: '#f9fafb', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}>
                                         📦
                                     </div>
                                     <div style={{ flex: 1 }}>
-                                        <h4 style={{ margin: 0 }}>{item.product.name}</h4>
-                                        <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '5px 0' }}>Qty: {item.quantity}</p>
-                                        <div style={{ fontWeight: '700' }}>${item.product.price * item.quantity}</div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>{item.product.name}</h4>
+                                            <button onClick={() => removeFromCart(item.product.id)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}>Remove</button>
+                                        </div>
+                                        <div style={{ color: '#6b7280', fontSize: '0.95rem', margin: '8px 0' }}>Qty: {item.quantity}</div>
+                                        <div style={{ fontWeight: '800', fontSize: '1.2rem' }}>${(item.product.price * item.quantity).toFixed(2)}</div>
                                     </div>
                                 </div>
                             ))
                         )}
                     </div>
 
-                    <div style={{ marginTop: '40px', borderTop: '2px solid #f3f4f6', paddingTop: '30px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: '800', marginBottom: '30px' }}>
+                    <div style={{ marginTop: '40px', borderTop: '2px solid #111827', paddingTop: '30px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: '900', marginBottom: '30px' }}>
                             <span>Total</span>
-                            <span>${cartTotal}</span>
+                            <span>${cartTotal.toFixed(2)}</span>
                         </div>
                         <button
                             disabled={cart.length === 0}
+                            onClick={() => router.push('/checkout')}
                             style={{
                                 width: '100%',
-                                backgroundColor: cart.length > 0 ? '#3b82f6' : '#9ca3af',
+                                backgroundColor: cart.length > 0 ? '#111827' : '#9ca3af',
                                 color: 'white',
-                                padding: '18px',
-                                borderRadius: '16px',
+                                padding: '22px',
+                                borderRadius: '20px',
                                 border: 'none',
-                                fontWeight: '700',
-                                fontSize: '1.1rem',
-                                cursor: cart.length > 0 ? 'pointer' : 'default'
+                                fontWeight: '800',
+                                fontSize: '1.2rem',
+                                cursor: cart.length > 0 ? 'pointer' : 'default',
+                                boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
                             }}
                         >
-                            Checkout Now
+                            Check Out
                         </button>
+                        <p style={{ textAlign: 'center', color: '#6b7280', fontSize: '0.85rem', marginTop: '20px' }}>
+                            Taxes and shipping calculated at checkout.
+                        </p>
                     </div>
                 </div>
             )}

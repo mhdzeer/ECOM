@@ -12,14 +12,14 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en">
-            <body style={{ margin: 0, padding: 0, backgroundColor: '#f9fafb' }}>
+            <body style={{ margin: 0, padding: 0, backgroundColor: '#f9fafb', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
                 <div style={{ display: 'flex' }}>
                     <Sidebar />
                     <main style={{
-                        marginLeft: '260px',
-                        width: 'calc(100% - 260px)',
+                        marginLeft: '280px',
+                        width: 'calc(100% - 280px)',
                         minHeight: '100vh',
-                        padding: '30px'
+                        padding: '40px'
                     }}>
                         {children}
                     </main>

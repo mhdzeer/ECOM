@@ -11,6 +11,7 @@ interface Product {
     stock_quantity: number;
     sku: string;
     category_id?: number;
+    images: { image_url: string }[];
 }
 
 export default function ProductsPage() {
@@ -24,7 +25,7 @@ export default function ProductsPage() {
         stock_quantity: 0,
         sku: '',
         category_id: 1,
-        images: []
+        imageUrl: ''
     });
 
     const domain = typeof window !== 'undefined' ? window.location.hostname : 'alzainportal.shopinbh.com';
@@ -48,17 +49,34 @@ export default function ProductsPage() {
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // In a real app, we'd need admin token. For now, we assume the backend doesn't enforce it strictly or we'll add auth later.
-            await axios.post(`${apiUrl}/`, {
-                ...newProduct,
-                images: [] // Initially empty
-            });
+            const payload = {
+                name: newProduct.name,
+                slug: newProduct.name.toLowerCase().replace(/ /g, '-'),
+                description: newProduct.description,
+                price: newProduct.price,
+                stock_quantity: newProduct.stock_quantity,
+                sku: newProduct.sku,
+                category_id: newProduct.category_id,
+                images: newProduct.imageUrl ? [{ image_url: newProduct.imageUrl, is_primary: true }] : []
+            };
+
+            await axios.post(`${apiUrl}/`, payload);
             setShowModal(false);
             fetchProducts();
-            setNewProduct({ name: '', description: '', price: 0, stock_quantity: 0, sku: '', category_id: 1, images: [] });
+            setNewProduct({ name: '', description: '', price: 0, stock_quantity: 0, sku: '', category_id: 1, imageUrl: '' });
         } catch (error) {
-            alert('Error creating product. Make sure you are logged in or have access.');
+            alert('Error creating product. Check console.');
             console.error(error);
+        }
+    };
+
+    const deleteProduct = async (id: number) => {
+        if (!confirm('Are you sure?')) return;
+        try {
+            await axios.delete(`${apiUrl}/${id}`);
+            fetchProducts();
+        } catch (error) {
+            alert('Failed to delete');
         }
     };
 
@@ -98,31 +116,35 @@ export default function ProductsPage() {
                         {loading ? (
                             <tr><td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>Loading products...</td></tr>
                         ) : products.length === 0 ? (
-                            <tr><td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>No products found. Start by adding one!</td></tr>
+                            <tr><td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>No products found.</td></tr>
                         ) : (
                             products.map((p) => (
                                 <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                                     <td style={{ padding: '16px 24px' }}>
-                                        <div style={{ fontWeight: '600', color: '#111827' }}>{p.name}</div>
-                                        <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>{p.description.substring(0, 50)}...</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ width: '48px', height: '48px', backgroundColor: '#f3f4f6', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                {p.images?.[0] ? <img src={p.images[0].image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : '📦'}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: '600', color: '#111827' }}>{p.name}</div>
+                                                <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>ID: {p.id}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td style={{ padding: '16px 24px', color: '#4b5563' }}>{p.sku}</td>
-                                    <td style={{ padding: '16px 24px', color: '#111827', fontWeight: '600' }}>${p.price}</td>
+                                    <td style={{ padding: '16px 24px', color: '#111827', fontWeight: '700' }}>${p.price.toFixed(2)}</td>
                                     <td style={{ padding: '16px 24px' }}>
                                         <span style={{
-                                            padding: '4px 10px',
-                                            borderRadius: '99px',
-                                            fontSize: '0.8rem',
-                                            fontWeight: '600',
-                                            backgroundColor: p.stock_quantity > 10 ? '#f0fdf4' : '#fef2f2',
-                                            color: p.stock_quantity > 10 ? '#166534' : '#991b1b'
+                                            padding: '4px 10px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: '700',
+                                            backgroundColor: p.stock_quantity > 0 ? '#f0fdf4' : '#fef2f2',
+                                            color: p.stock_quantity > 0 ? '#166534' : '#991b1b'
                                         }}>
-                                            {p.stock_quantity} in stock
+                                            {p.stock_quantity} units
                                         </span>
                                     </td>
                                     <td style={{ padding: '16px 24px' }}>
                                         <button style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontWeight: '600' }}>Edit</button>
-                                        <button style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: '600', marginLeft: '12px' }}>Delete</button>
+                                        <button onClick={() => deleteProduct(p.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: '600', marginLeft: '12px' }}>Delete</button>
                                     </td>
                                 </tr>
                             ))
@@ -131,92 +153,44 @@ export default function ProductsPage() {
                 </table>
             </div>
 
-            {/* Basic Modal */}
             {showModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 2000
-                }}>
-                    <div style={{
-                        backgroundColor: 'white',
-                        padding: '30px',
-                        borderRadius: '20px',
-                        width: '100%',
-                        maxWidth: '500px',
-                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
-                    }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+                    <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '550px' }}>
                         <h2 style={{ marginTop: 0, marginBottom: '20px' }}>Add New Product</h2>
                         <form onSubmit={handleCreate}>
-                            <div style={{ marginBottom: '15px' }}>
-                                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', fontWeight: '600' }}>Name</label>
-                                <input
-                                    required
-                                    type="text"
-                                    value={newProduct.name}
-                                    onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }}
-                                />
-                            </div>
-                            <div style={{ marginBottom: '15px' }}>
-                                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', fontWeight: '600' }}>Description</label>
-                                <textarea
-                                    required
-                                    value={newProduct.description}
-                                    onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', minHeight: '80px' }}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
-                                <div style={{ flex: 1 }}>
-                                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', fontWeight: '600' }}>Price ($)</label>
-                                    <input
-                                        required
-                                        type="number"
-                                        value={newProduct.price}
-                                        onChange={(e) => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) })}
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }}
-                                    />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                <div style={{ marginBottom: '15px', gridColumn: 'span 2' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: '600' }}>Product Name</label>
+                                    <input required value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }} placeholder="e.g. Premium Silk Scarf" />
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', fontWeight: '600' }}>Stock</label>
-                                    <input
-                                        required
-                                        type="number"
-                                        value={newProduct.stock_quantity}
-                                        onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: parseInt(e.target.value) })}
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }}
-                                    />
+                                <div style={{ marginBottom: '15px', gridColumn: 'span 2' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: '600' }}>Image URL</label>
+                                    <input value={newProduct.imageUrl} onChange={(e) => setNewProduct({ ...newProduct, imageUrl: e.target.value })} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }} placeholder="https://example.com/image.jpg" />
+                                </div>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: '600' }}>Price ($)</label>
+                                    <input required type="number" step="0.01" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) })} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+                                </div>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: '600' }}>Stock</label>
+                                    <input required type="number" value={newProduct.stock_quantity} onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: parseInt(e.target.value) })} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+                                </div>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: '600' }}>SKU</label>
+                                    <input required value={newProduct.sku} onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }} placeholder="PROD-001" />
+                                </div>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: '600' }}>Category ID</label>
+                                    <input required type="number" value={newProduct.category_id} onChange={(e) => setNewProduct({ ...newProduct, category_id: parseInt(e.target.value) })} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+                                </div>
+                                <div style={{ marginBottom: '15px', gridColumn: 'span 2' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: '600' }}>Description</label>
+                                    <textarea required value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', minHeight: '80px' }} />
                                 </div>
                             </div>
-                            <div style={{ marginBottom: '25px' }}>
-                                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', fontWeight: '600' }}>SKU (Unique Code)</label>
-                                <input
-                                    required
-                                    type="text"
-                                    value={newProduct.sku}
-                                    onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
-                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #e5e7eb', background: 'white', cursor: 'pointer' }}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: '600', cursor: 'pointer' }}
-                                >
-                                    Save Product
-                                </button>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                                <button type="button" onClick={() => setShowModal(false)} style={{ padding: '12px 24px', borderRadius: '10px', border: '1px solid #e5e7eb', background: 'white', cursor: 'pointer' }}>Cancel</button>
+                                <button type="submit" style={{ padding: '12px 24px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: '700', cursor: 'pointer' }}>Add Product</button>
                             </div>
                         </form>
                     </div>

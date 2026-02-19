@@ -9,7 +9,7 @@ const navSections = [
     {
         label: 'Overview',
         items: [
-            { href: '/admin', icon: '📊', label: 'Dashboard' },
+            { href: '/admin/dashboard', icon: '📊', label: 'Dashboard' },
         ]
     },
     {

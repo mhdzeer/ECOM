@@ -188,8 +188,6 @@ services:
       - ./admin:/app
       - /app/node_modules
       - /app/.next
-    ports:
-      - "39101:3000"
     networks:
       - ecom_network
     command: npm run dev

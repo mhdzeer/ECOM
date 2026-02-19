@@ -108,6 +108,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ecom_user}:${POSTGRES_PASSWORD:-ecom_password}@postgres:5432/${POSTGRES_DB:-ecommerce}
       REDIS_URL: redis://redis:6379
       PRODUCT_SERVICE_URL: http://product_service:8001
+      COUPON_SERVICE_URL: http://coupon_service:8007
+      NOTIFICATION_SERVICE_URL: http://notification_service:8008
       ROOT_PATH: /api/orders
     depends_on:
       postgres:
@@ -153,6 +155,57 @@ services:
     networks:
       - ecom_network
     command: uvicorn delivery_service.main:app --host 0.0.0.0 --port 8005 --reload
+
+  # Review Service
+  review_service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecom_review_service
+    environment:
+      SERVICE_NAME: review_service
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ecom_user}:${POSTGRES_PASSWORD:-ecom_password}@postgres:5432/${POSTGRES_DB:-ecommerce}
+      ROOT_PATH: /api/reviews
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecom_network
+    command: uvicorn review_service.main:app --host 0.0.0.0 --port 8006 --reload
+
+  # Coupon Service
+  coupon_service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecom_coupon_service
+    environment:
+      SERVICE_NAME: coupon_service
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ecom_user}:${POSTGRES_PASSWORD:-ecom_password}@postgres:5432/${POSTGRES_DB:-ecommerce}
+      ROOT_PATH: /api/coupons
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecom_network
+    command: uvicorn coupon_service.main:app --host 0.0.0.0 --port 8007 --reload
+
+  # Notification Service
+  notification_service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecom_notification_service
+    environment:
+      SERVICE_NAME: notification_service
+      SMTP_SERVER: ${SMTP_SERVER}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      ROOT_PATH: /api/notifications
+    networks:
+      - ecom_network
+    command: uvicorn notification_service.main:app --host 0.0.0.0 --port 8008 --reload
 
   # Customer Frontend (PWA)
   frontend:
@@ -209,6 +262,9 @@ services:
       - order_service
       - payment_service
       - delivery_service
+      - review_service
+      - coupon_service
+      - notification_service
       - frontend
       - admin
     networks:

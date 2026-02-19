@@ -43,6 +43,7 @@ class Product(Base):
     
     category = relationship("Category", back_populates="products")
     images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
+    variants = relationship("ProductVariant", back_populates="product", cascade="all, delete-orphan")
 
 class ProductImage(Base):
     __tablename__ = "product_images"
@@ -56,3 +57,38 @@ class ProductImage(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     product = relationship("Product", back_populates="images")
+
+class Attribute(Base):
+    __tablename__ = "attributes"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False) # e.g. "Color", "Size"
+    
+    options = relationship("AttributeOption", back_populates="attribute", cascade="all, delete-orphan")
+
+class AttributeOption(Base):
+    __tablename__ = "attribute_options"
+    id = Column(Integer, primary_key=True, index=True)
+    attribute_id = Column(Integer, ForeignKey("attributes.id"), nullable=False)
+    value = Column(String, nullable=False) # e.g. "Red", "XL"
+    
+    attribute = relationship("Attribute", back_populates="options")
+
+class ProductVariant(Base):
+    __tablename__ = "product_variants"
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    sku = Column(String, unique=True, index=True, nullable=False)
+    price = Column(Float, nullable=True) # If None, use base product price
+    stock_quantity = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    
+    product = relationship("Product", back_populates="variants")
+    attributes = relationship("ProductVariantAttribute", back_populates="variant", cascade="all, delete-orphan")
+
+class ProductVariantAttribute(Base):
+    __tablename__ = "product_variant_attributes"
+    variant_id = Column(Integer, ForeignKey("product_variants.id"), primary_key=True)
+    option_id = Column(Integer, ForeignKey("attribute_options.id"), primary_key=True)
+    
+    variant = relationship("ProductVariant", back_populates="attributes")
+    option = relationship("AttributeOption")

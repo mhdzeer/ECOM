@@ -73,18 +73,21 @@ export const api = {
     },
 
     // Orders
-    async createOrder(token: string, data: {
+    async createOrder(data: {
         items: { product_id: number; product_name: string; quantity: number; price: number }[];
         shipping_address: string;
         phone: string;
         notes?: string;
-    }) {
+        guest_email?: string;
+        guest_name?: string;
+        coupon_code?: string;
+    }, token?: string) {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch(`${getBaseUrl()}/orders/`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-            },
+            headers,
             body: JSON.stringify(data),
         });
         if (!res.ok) throw await res.json();
@@ -105,6 +108,85 @@ export const api = {
         });
         if (!res.ok) throw await res.json();
         return res.json();
+    },
+
+    // Reviews
+    async getProductReviews(productId: number) {
+        const res = await fetch(`${getBaseUrl()}/reviews/product/${productId}`);
+        if (!res.ok) throw await res.json();
+        return res.json();
+    },
+
+    async getProductReviewSummary(productId: number) {
+        const res = await fetch(`${getBaseUrl()}/reviews/product/${productId}/summary`);
+        if (!res.ok) throw await res.json();
+        return res.json();
+    },
+
+    async createReview(token: string, data: { product_id: number; rating: number; title?: string; body?: string }) {
+        const res = await fetch(`${getBaseUrl()}/reviews/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) throw await res.json();
+        return res.json();
+    },
+
+    // Coupons
+    async applyCoupon(code: string, orderTotal: number, token?: string) {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`${getBaseUrl()}/coupons/apply`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ code, order_total: orderTotal }),
+        });
+        if (!res.ok) throw await res.json();
+        return res.json();
+    },
+
+    // User Addresses
+    async getAddresses(token: string) {
+        const res = await fetch(`${getBaseUrl()}/auth/addresses`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw await res.json();
+        return res.json();
+    },
+
+    async addAddress(token: string, data: {
+        address_line1: string;
+        address_line2?: string;
+        city: string;
+        state?: string;
+        postal_code?: string;
+        country: string;
+        is_default?: boolean;
+    }) {
+        const res = await fetch(`${getBaseUrl()}/auth/addresses`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) throw await res.json();
+        return res.json();
+    },
+
+    async deleteAddress(token: string, id: number) {
+        const res = await fetch(`${getBaseUrl()}/auth/addresses/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw await res.json();
+        return true;
     },
 
     // Admin

@@ -42,8 +42,8 @@ function DashboardContent() {
     const statCards = [
         { label: 'Products', value: stats.products, icon: '📦', desc: 'In catalog' },
         { label: 'Total Orders', value: stats.orders, icon: '🛒', desc: 'All time' },
-        { label: 'Revenue', value: `$${stats.revenue.toFixed(0)}`, icon: '💰', desc: 'From delivered orders' },
-        { label: 'Pending Orders', value: stats.pending, icon: '⏳', desc: 'Awaiting action' },
+        { label: 'Revenue', value: `$${stats.revenue.toFixed(0)}`, icon: '💰', desc: 'From delivered' },
+        { label: 'Avg Rating', value: '4.8', icon: '⭐', desc: 'From reviews' },
     ];
 
     const statusColors: Record<string, string> = {

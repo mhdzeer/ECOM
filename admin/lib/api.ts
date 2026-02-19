@@ -105,4 +105,79 @@ export const adminApi = {
         if (!res.ok) throw await res.json();
         return res.json();
     },
+
+    // Coupons
+    async getCoupons(token: string) {
+        const res = await fetch(`${getBaseUrl()}/coupons/`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw await res.json();
+        return res.json();
+    },
+
+    async createCoupon(token: string, data: object) {
+        const res = await fetch(`${getBaseUrl()}/coupons/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) throw await res.json();
+        return res.json();
+    },
+
+    async deleteCoupon(token: string, code: string) {
+        const res = await fetch(`${getBaseUrl()}/coupons/${code}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw await res.json();
+        return true;
+    },
+
+    // Reviews
+    async getAdminReviews(token: string, status?: string) {
+        const query = status ? `?status=${status}` : '';
+        const res = await fetch(`${getBaseUrl()}/reviews/admin/all${query}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw await res.json();
+        return res.json();
+    },
+
+    async moderateReview(token: string, id: number, status: string) {
+        const res = await fetch(`${getBaseUrl()}/reviews/${id}/moderate?status=${status}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw await res.json();
+        return res.json();
+    },
+
+    // Variants & Attributes
+    async adminAddAttribute(token: string, data: { name: string }) {
+        const res = await fetch(`${getBaseUrl()}/products/attributes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data),
+        });
+        return res.json();
+    },
+
+    async adminAddAttributeOption(token: string, attrId: number, data: { value: string }) {
+        const res = await fetch(`${getBaseUrl()}/products/attributes/${attrId}/options`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data),
+        });
+        return res.json();
+    },
+
+    async adminAddProductVariant(token: string, productId: number, data: any) {
+        const res = await fetch(`${getBaseUrl()}/products/${productId}/variants`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data),
+        });
+        return res.json();
+    },
 };

@@ -167,6 +167,7 @@ function ProductsContent() {
                                         </td>
                                         <td style={{ padding: '14px 16px' }}>
                                             <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button onClick={() => router.push(`/admin/products/${p.id}/variants`)} style={{ padding: '6px 14px', backgroundColor: '#fdf4ff', color: '#9333ea', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.8rem' }}>Variants</button>
                                                 <button onClick={() => openEdit(p)} style={{ padding: '6px 14px', backgroundColor: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.8rem' }}>Edit</button>
                                                 <button onClick={() => handleDelete(p.id, p.name)} style={{ padding: '6px 14px', backgroundColor: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.8rem' }}>Delete</button>
                                             </div>

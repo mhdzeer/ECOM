@@ -82,12 +82,12 @@ async def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
         "user": user
     }
 
-@router.get("/me", response_model=schemas.UserResponse)
+@router.get("/me", response_model=schemas.UserDetailResponse)
 async def get_current_user_info(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get current user information"""
+    """Get current user information with addresses"""
     user = db.query(models.User).filter(models.User.id == int(current_user["sub"])).first()
     if not user:
         raise HTTPException(
@@ -95,6 +95,63 @@ async def get_current_user_info(
             detail="User not found"
         )
     return user
+
+@router.get("/addresses", response_model=list[schemas.AddressResponse])
+async def get_user_addresses(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all addresses for current user"""
+    addresses = db.query(models.UserAddress).filter(models.UserAddress.user_id == int(current_user["sub"])).all()
+    return addresses
+
+@router.post("/addresses", response_model=schemas.AddressResponse, status_code=status.HTTP_201_CREATED)
+async def create_user_address(
+    address_data: schemas.AddressCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Add a new address to user's address book"""
+    user_id = int(current_user["sub"])
+    
+    # If this is the first address or set as default, handle it
+    if address_data.is_default:
+        db.query(models.UserAddress).filter(models.UserAddress.user_id == user_id).update({"is_default": False})
+
+    new_address = models.UserAddress(
+        **address_data.dict(),
+        user_id=user_id
+    )
+    
+    # If it's the only address, make it default
+    existing_count = db.query(models.UserAddress).filter(models.UserAddress.user_id == user_id).count()
+    if existing_count == 0:
+        new_address.is_default = True
+
+    db.add(new_address)
+    db.commit()
+    db.refresh(new_address)
+    
+    return new_address
+
+@router.delete("/addresses/{address_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user_address(
+    address_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete an address from user's address book"""
+    address = db.query(models.UserAddress).filter(
+        models.UserAddress.id == address_id,
+        models.UserAddress.user_id == int(current_user["sub"])
+    ).first()
+    
+    if not address:
+        raise HTTPException(status_code=404, detail="Address not found")
+        
+    db.delete(address)
+    db.commit()
+    return None
 
 @router.post("/change-password")
 async def change_password(

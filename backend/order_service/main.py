@@ -10,9 +10,10 @@ from typing import List, Optional
 from datetime import datetime
 import enum
 import os
+import httpx
 
 from shared.database import Base, engine, get_db, init_db
-from shared.auth_middleware import get_current_user, get_current_admin
+from shared.auth_middleware import get_current_user, get_current_admin, get_optional_user
 
 app = FastAPI(
     title="Order Service", 
@@ -33,7 +34,9 @@ class OrderStatus(str, enum.Enum):
 class Order(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, nullable=True, index=True) # Null for guest
+    guest_email = Column(String, index=True)
+    guest_name = Column(String)
     order_number = Column(String, unique=True, index=True)
     status = Column(SQLEnum(OrderStatus), default=OrderStatus.PENDING)
     subtotal = Column(Float, nullable=False)
@@ -78,10 +81,14 @@ class OrderCreate(BaseModel):
     billing_address: Optional[str] = None
     phone: str
     notes: Optional[str] = None
+    guest_email: Optional[str] = None
+    guest_name: Optional[str] = None
+    coupon_code: Optional[str] = None
 
 class OrderResponse(BaseModel):
     id: int
-    user_id: int
+    user_id: Optional[int]
+    guest_email: Optional[str]
     order_number: str
     status: str
     subtotal: float
@@ -102,18 +109,52 @@ async def startup_event():
     Base.metadata.create_all(bind=engine)
 
 @app.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
-async def create_order(order_data: OrderCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Create a new order"""
+async def create_order(
+    order_data: OrderCreate, 
+    current_user: Optional[dict] = Depends(get_optional_user), 
+    db: Session = Depends(get_db)
+):
+    """Create a new order (supports guest, coupons, and notifications)"""
     import random
     order_number = f"ORD-{random.randint(100000, 999999)}"
     
     subtotal = sum(item.price * item.quantity for item in order_data.items)
-    tax = round(subtotal * 0.1, 2)
-    shipping_cost = 0.0 if subtotal >= 50 else 5.99
-    total = round(subtotal + tax + shipping_cost, 2)
+    
+    # 1. Apply Coupon if provided
+    discount_amount = 0.0
+    applied_coupon = None
+    if order_data.coupon_code:
+        try:
+            async with httpx.AsyncClient() as client:
+                coupon_resp = await client.post(
+                    f"{os.getenv('COUPON_SERVICE_URL')}/apply",
+                    json={"code": order_data.coupon_code, "order_total": subtotal},
+                    headers={"Authorization": f"Bearer {current_user['access_token']}"} if current_user else {}
+                )
+                if coupon_resp.status_code == 200:
+                    data = coupon_resp.json()
+                    if data["valid"]:
+                        discount_amount = data["discount_amount"]
+                        applied_coupon = order_data.coupon_code
+        except Exception as e:
+            print(f"Coupon service error: {e}")
+
+    # 2. Calculate Final Totals
+    tax_rate = float(os.getenv("TAX_RATE", "0.1"))
+    tax = round((subtotal - discount_amount) * tax_rate, 2)
+    
+    free_shipping_threshold = float(os.getenv("FREE_SHIPPING_THRESHOLD", "50"))
+    standard_shipping = float(os.getenv("SHIPPING_COST", "5.99"))
+    shipping_cost = 0.0 if (subtotal - discount_amount) >= free_shipping_threshold else standard_shipping
+    
+    total = round(subtotal - discount_amount + tax + shipping_cost, 2)
+    
+    user_id = int(current_user["sub"]) if current_user else None
     
     order = Order(
-        user_id=int(current_user["sub"]),
+        user_id=user_id,
+        guest_email=order_data.guest_email if not user_id else None,
+        guest_name=order_data.guest_name if not user_id else None,
         order_number=order_number,
         subtotal=subtotal,
         tax=tax,
@@ -122,7 +163,7 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
         shipping_address=order_data.shipping_address,
         billing_address=order_data.billing_address or order_data.shipping_address,
         phone=order_data.phone,
-        notes=order_data.notes
+        notes=order_data.notes if not applied_coupon else f"{order_data.notes or ''} [Coupon: {applied_coupon}]"
     )
     db.add(order)
     db.flush()
@@ -140,6 +181,30 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     
     db.commit()
     db.refresh(order)
+
+    # 3. Send Notification
+    customer_email = order.guest_email if not user_id else current_user.get("email")
+    if customer_email:
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{os.getenv('NOTIFICATION_SERVICE_URL')}/order-confirmation",
+                    params={
+                        "email": customer_email,
+                        "order_number": order.order_number,
+                        "total": order.total
+                    }
+                )
+        except Exception as e:
+            print(f"Notification service error: {e}")
+
+    # 4. Mark coupon as used if applied
+    if applied_coupon:
+        try:
+            async with httpx.AsyncClient() as client:
+                 await client.post(f"{os.getenv('COUPON_SERVICE_URL')}/use/{applied_coupon}")
+        except: pass
+
     return order
 
 @app.get("/admin/all", response_model=List[OrderResponse])

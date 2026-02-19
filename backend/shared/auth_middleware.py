@@ -70,3 +70,14 @@ async def get_current_admin(current_user: dict = Depends(get_current_user)) -> d
             detail="Not enough permissions"
         )
     return current_user
+
+async def get_optional_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
+    """Dependency to get current user if token is present, else None"""
+    if not credentials:
+        return None
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None

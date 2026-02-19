@@ -39,6 +39,35 @@ async def get_category(category_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Category not found")
     return category
 
+# Attribute Routes
+@router.post("/attributes", response_model=schemas.AttributeResponse, status_code=status.HTTP_201_CREATED)
+async def create_attribute(
+    attribute_data: schemas.AttributeCreate,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin)
+):
+    attr = models.Attribute(**attribute_data.dict())
+    db.add(attr)
+    db.commit()
+    db.refresh(attr)
+    return attr
+
+@router.get("/attributes", response_model=list[schemas.AttributeResponse])
+async def list_attributes(db: Session = Depends(get_db)):
+    return db.query(models.Attribute).all()
+
+@router.post("/attribute-options", response_model=schemas.AttributeOptionResponse, status_code=status.HTTP_201_CREATED)
+async def create_attribute_option(
+    option_data: schemas.AttributeOptionCreate,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin)
+):
+    opt = models.AttributeOption(**option_data.dict())
+    db.add(opt)
+    db.commit()
+    db.refresh(opt)
+    return opt
+
 # Product Routes
 @router.post("/", response_model=schemas.ProductResponse, status_code=status.HTTP_201_CREATED)
 async def create_product(
@@ -64,6 +93,33 @@ async def create_product(
     db.commit()
     db.refresh(product)
     return product
+
+@router.post("/{product_id}/variants", response_model=schemas.ProductVariantResponse)
+async def create_product_variant(
+    product_id: int,
+    variant_data: schemas.ProductVariantCreate,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin)
+):
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    variant_dict = variant_data.dict(exclude={"attribute_option_ids"})
+    variant = models.ProductVariant(**variant_dict, product_id=product_id)
+    db.add(variant)
+    db.flush()
+    
+    for opt_id in variant_data.attribute_option_ids:
+        db.add(models.ProductVariantAttribute(variant_id=variant.id, option_id=opt_id))
+    
+    db.commit()
+    db.refresh(variant)
+    return variant
+
+@router.get("/{product_id}/variants", response_model=List[schemas.ProductVariantResponse])
+async def list_product_variants(product_id: int, db: Session = Depends(get_db)):
+    return db.query(models.ProductVariant).filter(models.ProductVariant.product_id == product_id).all()
 
 @router.get("/", response_model=schemas.ProductListResponse)
 async def list_products(

@@ -12,22 +12,64 @@ function AccountContent() {
     const { user, token, logout, toast } = useApp();
     const router = useRouter();
     const [orders, setOrders] = useState<any[]>([]);
-    const [tab, setTab] = useState<'overview' | 'orders' | 'settings'>('overview');
+    const [addresses, setAddresses] = useState<any[]>([]);
+    const [tab, setTab] = useState<'overview' | 'orders' | 'addresses' | 'settings'>('overview');
+
+    // Address Form
+    const [showAddrForm, setShowAddrForm] = useState(false);
+    const [addrForm, setAddrForm] = useState({
+        address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'Bahrain', is_default: false
+    });
+
+    // Password Form
     const [pwdForm, setPwdForm] = useState({ old_password: '', new_password: '', confirm: '' });
     const [pwdLoading, setPwdLoading] = useState(false);
 
     useEffect(() => {
         if (!token) { router.push('/login'); return; }
-        api.getOrders(token).then(data => setOrders(Array.isArray(data) ? data : [])).catch(() => { });
+        fetchData();
     }, [token]);
+
+    const fetchData = async () => {
+        try {
+            const [ordersData, addressesData] = await Promise.all([
+                api.getOrders(token!),
+                api.getAddresses(token!)
+            ]);
+            setOrders(Array.isArray(ordersData) ? ordersData : []);
+            setAddresses(Array.isArray(addressesData) ? addressesData : []);
+        } catch (err) { }
+    };
+
+    const handleAddAddress = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await api.addAddress(token!, addrForm);
+            toast("Address added!", "success");
+            setShowAddrForm(false);
+            setAddrForm({ address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'Bahrain', is_default: false });
+            fetchData();
+        } catch (err: any) {
+            toast(err.detail || "Failed to add address", "error");
+        }
+    };
+
+    const handleDeleteAddress = async (id: number) => {
+        try {
+            await api.deleteAddress(token!, id);
+            toast("Address removed", "success");
+            fetchData();
+        } catch (err: any) {
+            toast("Failed to remove address", "error");
+        }
+    };
 
     const changePassword = async (e: React.FormEvent) => {
         e.preventDefault();
         if (pwdForm.new_password !== pwdForm.confirm) { toast('Passwords do not match', 'error'); return; }
         setPwdLoading(true);
         try {
-            const domain = window.location.hostname;
-            const res = await fetch(`http://${domain}:39101/api/auth/change-password`, {
+            const res = await fetch(`http://${window.location.hostname}:39101/api/auth/change-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ old_password: pwdForm.old_password, new_password: pwdForm.new_password }),
@@ -73,8 +115,8 @@ function AccountContent() {
                 </div>
 
                 {/* Tabs */}
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', backgroundColor: 'white', padding: '6px', borderRadius: '14px', border: '1px solid #e5e7eb', width: 'fit-content' }}>
-                    {(['overview', 'orders', 'settings'] as const).map(t => (
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', backgroundColor: 'white', padding: '6px', borderRadius: '14px', border: '1px solid #e5e7eb', width: 'fit-content', flexWrap: 'wrap' }}>
+                    {(['overview', 'orders', 'addresses', 'settings'] as const).map(t => (
                         <button key={t} onClick={() => setTab(t)} style={{ padding: '10px 24px', borderRadius: '10px', border: 'none', backgroundColor: tab === t ? '#2563eb' : 'transparent', color: tab === t ? 'white' : '#4b5563', fontWeight: '700', cursor: 'pointer', textTransform: 'capitalize', fontSize: '0.875rem' }}>
                             {t}
                         </button>
@@ -87,16 +129,16 @@ function AccountContent() {
                         {[
                             { icon: '📦', label: 'Total Orders', value: orders.length, color: '#eff6ff', link: '/orders' },
                             { icon: '🚚', label: 'Awaiting Delivery', value: orders.filter((o: any) => ['pending', 'processing', 'shipped'].includes(o.status)).length, color: '#fff7ed', link: '/orders' },
-                            { icon: '✅', label: 'Delivered', value: orders.filter((o: any) => o.status === 'delivered').length, color: '#f0fdf4', link: '/orders' },
+                            { icon: '📍', label: 'Stored Addresses', value: addresses.length, color: '#f0fdf4', link: '#' },
                             { icon: '❤️', label: 'Wishlist Items', value: 0, color: '#fef2f2', link: '/wishlist' },
                         ].map(card => (
-                            <Link key={card.label} href={card.link} style={{ textDecoration: 'none', backgroundColor: card.color, borderRadius: '16px', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(0,0,0,0.04)' }}>
+                            <div key={card.label} onClick={() => card.link === '#' && setTab('addresses')} style={{ cursor: card.link === '#' ? 'pointer' : 'default', textDecoration: 'none', backgroundColor: card.color, borderRadius: '16px', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(0,0,0,0.04)' }}>
                                 <div>
                                     <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '6px' }}>{card.label}</div>
                                     <div style={{ fontSize: '2rem', fontWeight: '900', color: '#111827' }}>{card.value}</div>
                                 </div>
                                 <span style={{ fontSize: '2rem' }}>{card.icon}</span>
-                            </Link>
+                            </div>
                         ))}
                     </div>
                 )}
@@ -120,6 +162,53 @@ function AccountContent() {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {/* Addresses */}
+                {tab === 'addresses' && (
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h3 style={{ fontWeight: '800', margin: 0 }}>My Addresses</h3>
+                            <button onClick={() => setShowAddrForm(!showAddrForm)} style={{ padding: '8px 16px', backgroundColor: '#111827', color: 'white', borderRadius: '8px', border: 'none', fontWeight: '700', cursor: 'pointer' }}>
+                                {showAddrForm ? 'Cancel' : '+ Add New'}
+                            </button>
+                        </div>
+
+                        {showAddrForm && (
+                            <form onSubmit={handleAddAddress} style={{ backgroundColor: 'white', padding: '24px', borderRadius: '16px', border: '2px solid #2563eb', marginBottom: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div style={{ gridColumn: 'span 2' }}>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', marginBottom: '6px' }}>Address Line 1</label>
+                                    <input required value={addrForm.address_line1} onChange={e => setAddrForm({ ...addrForm, address_line1: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                                </div>
+                                <div style={{ gridColumn: 'span 2' }}>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', marginBottom: '6px' }}>Address Line 2 (Optional)</label>
+                                    <input value={addrForm.address_line2} onChange={e => setAddrForm({ ...addrForm, address_line2: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', marginBottom: '6px' }}>City</label>
+                                    <input required value={addrForm.city} onChange={e => setAddrForm({ ...addrForm, city: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', marginBottom: '6px' }}>Country</label>
+                                    <input required value={addrForm.country} onChange={e => setAddrForm({ ...addrForm, country: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                                </div>
+                                <button type="submit" style={{ gridColumn: 'span 2', padding: '12px', backgroundColor: '#2563eb', color: 'white', borderRadius: '10px', border: 'none', fontWeight: '800', cursor: 'pointer' }}>Save Address</button>
+                            </form>
+                        )}
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                            {addresses.length === 0 ? (
+                                <p style={{ color: '#6b7280' }}>No saved addresses found.</p>
+                            ) : addresses.map(addr => (
+                                <div key={addr.id} style={{ backgroundColor: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e5e7eb', position: 'relative' }}>
+                                    <div style={{ fontWeight: '800' }}>{addr.city}, {addr.country}</div>
+                                    <div style={{ color: '#4b5563', fontSize: '0.9rem', marginTop: '6px' }}>{addr.address_line1}</div>
+                                    {addr.address_line2 && <div style={{ color: '#4b5563', fontSize: '0.9rem' }}>{addr.address_line2}</div>}
+                                    <button onClick={() => handleDeleteAddress(addr.id)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '1.2rem' }}>🗑️</button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
 

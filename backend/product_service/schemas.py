@@ -40,6 +40,53 @@ class ProductImageResponse(ProductImageBase):
     class Config:
         from_attributes = True
 
+# Attribute & Variant Schemas
+class AttributeOptionBase(BaseModel):
+    value: str
+
+class AttributeOptionCreate(AttributeOptionBase):
+    attribute_id: int
+
+class AttributeOptionResponse(AttributeOptionBase):
+    id: int
+    attribute_id: int
+    class Config:
+        from_attributes = True
+
+class AttributeBase(BaseModel):
+    name: str
+
+class AttributeCreate(AttributeBase):
+    pass
+
+class AttributeResponse(AttributeBase):
+    id: int
+    options: List[AttributeOptionResponse] = []
+    class Config:
+        from_attributes = True
+
+class ProductVariantAttributeResponse(BaseModel):
+    option_id: int
+    option: AttributeOptionResponse
+    class Config:
+        from_attributes = True
+
+class ProductVariantBase(BaseModel):
+    sku: str
+    price: Optional[float] = None
+    stock_quantity: int = 0
+    is_active: bool = True
+
+class ProductVariantCreate(ProductVariantBase):
+    attribute_option_ids: List[int]
+
+class ProductVariantResponse(ProductVariantBase):
+    id: int
+    product_id: int
+    attributes: List[ProductVariantAttributeResponse] = []
+    class Config:
+        from_attributes = True
+
 # Product Schemas
 class ProductBase(BaseModel):
     name: str
@@ -81,6 +128,7 @@ class ProductResponse(ProductBase):
     updated_at: Optional[datetime]
     category: Optional[CategoryResponse] = None
     images: List[ProductImageResponse] = []
+    variants: List[ProductVariantResponse] = []
 
     class Config:
         from_attributes = True

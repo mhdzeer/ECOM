@@ -37,3 +37,27 @@ class TokenRefresh(BaseModel):
 class PasswordChange(BaseModel):
     old_password: str
     new_password: str = Field(..., min_length=8)
+
+# Address Schemas
+class AddressBase(BaseModel):
+    address_line1: str
+    address_line2: Optional[str] = None
+    city: str
+    state: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: str
+    is_default: bool = False
+
+class AddressCreate(AddressBase):
+    pass
+
+class AddressResponse(AddressBase):
+    id: int
+    user_id: int
+
+    class Config:
+        from_attributes = True
+
+# Update UserResponse to include addresses
+class UserDetailResponse(UserResponse):
+    addresses: list[AddressResponse] = []

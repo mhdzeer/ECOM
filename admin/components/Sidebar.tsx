@@ -18,6 +18,8 @@ const navSections = [
             { href: '/admin/products', icon: '📦', label: 'Products' },
             { href: '/admin/categories', icon: '🏷️', label: 'Categories' },
             { href: '/admin/orders', icon: '🛒', label: 'Orders' },
+            { href: '/admin/coupons', icon: '🎟️', label: 'Coupons' },
+            { href: '/admin/reviews', icon: '⭐', label: 'Reviews' },
         ]
     },
     {
@@ -58,7 +60,7 @@ export default function Sidebar() {
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                             {section.items.map(item => {
-                                const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
+                                const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
                                 return (
                                     <Link key={item.href} href={item.href} style={{
                                         display: 'flex', alignItems: 'center', gap: '10px',
